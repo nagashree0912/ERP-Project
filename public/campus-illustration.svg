@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c7d2fe"/><stop offset=".55" stop-color="#eef2ff"/><stop offset="1" stop-color="#bfdbfe"/></linearGradient>
+  <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#334155"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>
+  <linearGradient id="grass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#86efac"/><stop offset="1" stop-color="#4ade80"/></linearGradient>
+</defs>
+<rect width="1200" height="800" fill="url(#sky)"/>
+<circle cx="980" cy="115" r="72" fill="#fff" opacity=".55"/>
+<path d="M0 470 C170 400 250 450 400 430 C570 408 670 430 810 405 C970 378 1090 410 1200 385 V800 H0Z" fill="url(#grass)" opacity=".9"/>
+<path d="M0 600 Q250 520 490 600 T1200 565 V800 H0Z" fill="#65a30d" opacity=".25"/>
+<!-- main academic building -->
+<rect x="140" y="300" width="720" height="290" rx="8" fill="#f8fafc"/>
+<rect x="105" y="275" width="790" height="45" rx="7" fill="#e2e8f0"/>
+<path d="M115 275 L500 130 L885 275Z" fill="#475569"/>
+<path d="M165 270 L500 150 L835 270Z" fill="#64748b"/>
+<rect x="450" y="235" width="100" height="55" fill="#1e293b"/>
+<path d="M470 235 L500 205 L530 235Z" fill="#1e293b"/>
+<g fill="url(#glass)">
+  <rect x="175" y="350" width="75" height="80"/><rect x="285" y="350" width="75" height="80"/><rect x="395" y="350" width="75" height="80"/><rect x="505" y="350" width="75" height="80"/><rect x="615" y="350" width="75" height="80"/><rect x="725" y="350" width="75" height="80"/>
+  <rect x="175" y="465" width="75" height="80"/><rect x="285" y="465" width="75" height="80"/><rect x="395" y="465" width="75" height="80"/><rect x="505" y="465" width="75" height="80"/><rect x="615" y="465" width="75" height="80"/><rect x="725" y="465" width="75" height="80"/>
+</g>
+<g fill="#dbeafe"><rect x="265" y="345" width="18" height="205"/><rect x="375" y="345" width="18" height="205"/><rect x="485" y="345" width="18" height="205"/><rect x="595" y="345" width="18" height="205"/><rect x="705" y="345" width="18" height="205"/></g>
+<!-- trees -->
+<g><rect x="70" y="485" width="20" height="95" fill="#7c2d12"/><circle cx="80" cy="465" r="55" fill="#166534"/><circle cx="55" cy="485" r="36" fill="#15803d"/><circle cx="105" cy="490" r="40" fill="#22c55e"/></g>
+<g><rect x="910" y="445" width="22" height="125" fill="#7c2d12"/><circle cx="920" cy="415" r="60" fill="#166534"/><circle cx="880" cy="440" r="42" fill="#15803d"/><circle cx="960" cy="445" r="44" fill="#22c55e"/></g>
+<path d="M470 590 H530 L640 800 H360Z" fill="#e2e8f0" opacity=".8"/>
+<g fill="#fff" opacity=".55"><circle cx="210" cy="160" r="10"/><circle cx="250" cy="125" r="7"/><circle cx="300" cy="170" r="12"/></g>
+</svg>
