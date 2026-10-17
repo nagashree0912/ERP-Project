@@ -27,7 +27,7 @@ export default function StudentsPage() {
 
   if (isParent) {
     const child = store.getParentStudent(user?.email);
-    return <Shell><ParentChildView child={child} /></Shell>;
+    return <Shell><ParentChildView child={child} classrooms={store.classes} /></Shell>;
   }
 
   if (user?.role !== "principal") {
@@ -58,8 +58,10 @@ function PrincipalStudents() {
   const [filterSection, setFilterSection] = useState("All Sections");
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [classroomError, setClassroomError] = useState("");
 
   const allStudents: any[] = c.rows as any[];
+  const classrooms = store.classes as { id: string; name: string }[];
 
   /* filter helpers */
   const departments = useMemo(() => ["All Departments", ...Array.from(new Set(allStudents.map((s: any) => s.department).filter(Boolean)))], [allStudents]);
@@ -79,10 +81,17 @@ function PrincipalStudents() {
   const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
+    const classId = String(f.get("class_id") || "");
+    if (!classrooms.some(classroom => String(classroom.id) === classId)) {
+      setClassroomError(classrooms.length ? "Please select a valid classroom." : "No classrooms are available. Add a classroom before adding students.");
+      return;
+    }
+
+    setClassroomError("");
     c.save({
       full_name: f.get("full_name"), email: f.get("email"), phone: f.get("phone"),
       department: f.get("department"), course: f.get("course"), year: f.get("year"),
-      section: f.get("section"), roll_number: f.get("roll_number"),
+      section: f.get("section"), roll_number: f.get("roll_number"), class_id: classId,
       status: "Active", admission_date: f.get("admission_date") || "2026-08-01"
     });
   };
@@ -166,6 +175,7 @@ function PrincipalStudents() {
                   <th>Roll Number</th>
                   <th>Department</th>
                   <th>Year</th>
+                  <th>Classroom</th>
                   <th>Section</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -181,6 +191,7 @@ function PrincipalStudents() {
                     <td className="font-mono text-xs">{x.roll_number || x.roll_no}</td>
                     <td>{x.department}</td>
                     <td>{x.year}</td>
+                    <td>{classroomName(classrooms, x.class_id)}</td>
                     <td><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">{x.section || "—"}</span></td>
                     <td><Badge tone={statusTone(x.status)}>{x.status || "Active"}</Badge></td>
                     <td>
@@ -216,6 +227,22 @@ function PrincipalStudents() {
               <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option>
             </select>
           </Field>
+          <Field label="Classroom *">
+            <select
+              name="class_id"
+              required
+              defaultValue={c.edit?.class_id || ""}
+              disabled={classrooms.length === 0}
+              onInvalid={() => setClassroomError("Please select a classroom.")}
+              onChange={() => setClassroomError("")}
+              className="input"
+            >
+              <option value="">Select a classroom</option>
+              {classrooms.map(classroom => <option key={classroom.id} value={classroom.id}>{classroom.name}</option>)}
+            </select>
+            {classroomError && <p role="alert" className="mt-1 text-xs text-rose-600">{classroomError}</p>}
+            {classrooms.length === 0 && <p className="mt-1 text-xs text-amber-700">No classrooms are available. Add a classroom before adding students.</p>}
+          </Field>
           <Field label="Section">
             <select name="section" defaultValue={c.edit?.section || "A"} className="input">
               <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
@@ -224,7 +251,7 @@ function PrincipalStudents() {
           <Field label="Admission date"><input name="admission_date" type="date" defaultValue={c.edit?.admission_date} className="input" /></Field>
           <div className="sm:col-span-2 flex justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={() => c.setOpen(false)}>Cancel</button>
-            <button className="btn-primary">Save Student</button>
+            <button className="btn-primary" disabled={classrooms.length === 0}>Save Student</button>
           </div>
         </form>
       </Modal>
@@ -233,7 +260,7 @@ function PrincipalStudents() {
       <Confirm open={!!c.del} onClose={() => c.setDel(null)} onYes={() => c.doDelete(c.del.id)} title="Delete student" msg={`Delete ${c.del?.full_name}?`} />
 
       {/* Bulk Add Modal */}
-      <BulkAddModal open={showBulkModal} onClose={() => setShowBulkModal(false)} onSave={handleBulkSave} />
+      <BulkAddModal open={showBulkModal} onClose={() => setShowBulkModal(false)} onSave={handleBulkSave} classrooms={classrooms} />
     </Shell>
   );
 }
@@ -271,12 +298,14 @@ const emptyRow = (): BulkRow => ({
   full_name: "", email: "", phone: "", roll_number: "", gender: "Female"
 });
 
-function BulkAddModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (rows: any[]) => void }) {
+function BulkAddModal({ open, onClose, onSave, classrooms }: { open: boolean; onClose: () => void; onSave: (rows: any[]) => void; classrooms: { id: string; name: string }[] }) {
   const [dept, setDept] = useState("Computer Science(CS)");
   const [course, setCourse] = useState("B.Tech");
   const [year, setYear] = useState("3rd Year");
   const [section, setSection] = useState("A");
   const [admDate, setAdmDate] = useState("2026-09-28");
+  const [classId, setClassId] = useState("");
+  const [classroomError, setClassroomError] = useState("");
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([emptyRow(), emptyRow(), emptyRow(), emptyRow(), emptyRow()]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -291,12 +320,16 @@ function BulkAddModal({ open, onClose, onSave }: { open: boolean; onClose: () =>
   const removeRow = (id: string) => setBulkRows(prev => prev.filter(r => r.id !== id));
 
   const handleSave = () => {
+    if (!classrooms.some(classroom => classroom.id === classId)) {
+      setClassroomError(classrooms.length ? "Please select a classroom." : "No classrooms are available. Add a classroom before adding students.");
+      return;
+    }
     const valid = bulkRows.filter(r => r.full_name.trim() && r.email.trim() && r.roll_number.trim());
     if (valid.length === 0) return;
     onSave(valid.map(r => ({
       full_name: r.full_name, email: r.email, phone: r.phone,
       roll_number: r.roll_number, gender: r.gender,
-      department: dept, course, year, section, admission_date: admDate
+      department: dept, course, year, section, admission_date: admDate, class_id: classId
     })));
     setBulkRows([emptyRow(), emptyRow(), emptyRow(), emptyRow(), emptyRow()]);
   };
@@ -352,6 +385,20 @@ function BulkAddModal({ open, onClose, onSave }: { open: boolean; onClose: () =>
               <span className="text-xs text-slate-500">(Common for all students)</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="label text-xs">Classroom *</label>
+                <select
+                  value={classId}
+                  onChange={e => { setClassId(e.target.value); setClassroomError(""); }}
+                  disabled={classrooms.length === 0}
+                  className="input mt-1 text-sm"
+                >
+                  <option value="">Select a classroom</option>
+                  {classrooms.map(classroom => <option key={classroom.id} value={classroom.id}>{classroom.name}</option>)}
+                </select>
+                {classroomError && <p role="alert" className="mt-1 text-xs text-rose-600">{classroomError}</p>}
+                {classrooms.length === 0 && <p className="mt-1 text-xs text-amber-700">No classrooms are available. Add a classroom before adding students.</p>}
+              </div>
               <div>
                 <label className="label text-xs">Department *</label>
                 <select value={dept} onChange={e => setDept(e.target.value)} className="input mt-1 text-sm">
@@ -506,6 +553,7 @@ function BulkAddModal({ open, onClose, onSave }: { open: boolean; onClose: () =>
           <button onClick={onClose} className="btn-secondary">Cancel</button>
           <button
             onClick={handleSave}
+            disabled={classrooms.length === 0}
             className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition shadow-md"
           >
             <GraduationCap size={15} /> Save All Students
@@ -750,7 +798,7 @@ function StatCard({ icon, iconBg, label, value, large = false }: { icon: React.R
 /*  Parent child view                                                   */
 /* ─────────────────────────────────────────────────────────────────── */
 
-function ParentChildView({ child }: { child: any | null }) {
+function ParentChildView({ child, classrooms }: { child: any | null; classrooms: { id: string; name: string }[] }) {
   if (!child) return (
     <div className="card mx-auto max-w-xl p-10 text-center">
       <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-rose-50 text-rose-500"><Users size={28} /></div>
@@ -787,12 +835,17 @@ function ParentChildView({ child }: { child: any | null }) {
             <Info icon={<BookOpen size={17} />} label="Department" value={child.department || "Not available"} />
             <Info icon={<GraduationCap size={17} />} label="Course" value={child.course || "B.Tech"} />
             <Info icon={<CalendarDays size={17} />} label="Year" value={child.year || "Not available"} />
+            <Info icon={<Users size={17} />} label="Classroom" value={classroomName(classrooms, child.class_id)} />
             <Info icon={<Users size={17} />} label="Section" value={child.section || "Not available"} />
           </div>
         </div>
       </div>
     </>
   );
+}
+
+function classroomName(classrooms: { id: string; name: string }[], classId?: string) {
+  return classrooms.find(classroom => String(classroom.id) === String(classId))?.name || (classId ? "Classroom unavailable" : "Not assigned");
 }
 
 function Info({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {

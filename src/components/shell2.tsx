@@ -27,12 +27,14 @@ import {
   Megaphone,
   MessageSquareWarning,
   FileCheck,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 
 const principalNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/classes", label: "Classrooms", icon: School },
   { href: "/students", label: "Students", icon: GraduationCap },
   { href: "/teachers", label: "Teachers", icon: Users },
   { href: "/parents", label: "Parents", icon: UserRound },
@@ -42,7 +44,8 @@ const principalNav = [
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/notices", label: "Notices", icon: Megaphone },
   { href: "/reports", label: "Reports", icon: FileBarChart },
-  { href: "/leaves", label: "Modification Requests", icon: FileText },
+  { href: "/leaves", label: "Leave Applications Request", icon: FileText },
+  { href: "/marks-modification-requests", label: "Marks Modification Requests", icon: FileSpreadsheet },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

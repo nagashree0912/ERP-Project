@@ -54,7 +54,6 @@ export function useAuth() {
    SESSION KEYS
    ========================================================= */
 
-const ROLE_KEY = "campusflow_role";
 const DEMO_USER_KEY = "campusflow_demo_user";
 
 /* =========================================================
@@ -72,6 +71,55 @@ function normalizeRole(value: any): Role {
   if (role === "student") return "student";
 
   return "student";
+}
+
+function parseProfileRole(value: unknown): Role | null {
+  const role = String(value || "").trim().toLowerCase();
+  if (role === "principal" || role === "teacher" || role === "parent" || role === "student") {
+    return role;
+  }
+  return null;
+}
+
+async function getProfileRole(supabase: ReturnType<typeof createClient>, userId: string) {
+  const { data: profile, error } = await supabase
+    .schema("public")
+    .from("profiles")
+    .select("id,role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Authenticated profile role lookup failed:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return {
+      role: null,
+      error: error.code === "PGRST205"
+        ? "The configured Supabase Data API cannot resolve public.profiles. Verify the project URL, exposed public schema, and PostgREST schema cache."
+        : "Unable to read your CampusFlow profile. Check the server/database error logs.",
+    };
+  }
+
+  if (!profile) {
+    return {
+      role: null,
+      error: "No CampusFlow profile exists for this authenticated account. Ask the Principal to link the existing Auth user ID; do not create another Auth user.",
+    };
+  }
+  if (profile.id !== userId) {
+    return { role: null, error: "The CampusFlow profile ID does not match the authenticated user ID." };
+  }
+
+  const role = parseProfileRole(profile.role);
+  if (!role) {
+    return { role: null, error: "Your CampusFlow profile has an unsupported role. Ask the Principal to correct the profile role." };
+  }
+
+  return { role, error: null };
 }
 
 /* =========================================================
@@ -125,35 +173,13 @@ const DEMO_USERS: DemoUser[] = [
 
 function buildUser(
   sessionUser: any,
-  selectedRole?: Role | null
+  role: Role
 ): DemoUser | null {
   if (!sessionUser) {
     return null;
   }
 
   const metadata = sessionUser.user_metadata || {};
-
-  let savedRole: Role | null = null;
-
-  if (typeof window !== "undefined") {
-    savedRole = normalizeRole(
-      sessionStorage.getItem(ROLE_KEY)
-    );
-  }
-
-  const metadataRole =
-    metadata.role ||
-    metadata.user_role ||
-    metadata.account_role ||
-    null;
-
-  const role = metadataRole
-    ? normalizeRole(metadataRole)
-    : selectedRole
-      ? normalizeRole(selectedRole)
-      : savedRole
-        ? savedRole
-        : "student";
 
   return {
     id: sessionUser.id,
@@ -217,17 +243,9 @@ export function AuthProvider({
         if (!mounted) return;
 
         if (session?.user) {
-          const savedRole =
-            typeof window !== "undefined"
-              ? sessionStorage.getItem(ROLE_KEY)
-              : null;
-
-          const currentUser = buildUser(
-            session.user,
-            savedRole ? normalizeRole(savedRole) : null
-          );
-
-          setUser(currentUser);
+          const result = await getProfileRole(supabase, session.user.id);
+          if (!mounted) return;
+          setUser(result.role ? buildUser(session.user, result.role) : null);
         } else {
           setUser(null);
         }
@@ -255,17 +273,9 @@ export function AuthProvider({
         return;
       }
 
-      const savedRole =
-        typeof window !== "undefined"
-          ? sessionStorage.getItem(ROLE_KEY)
-          : null;
-
-      const currentUser = buildUser(
-        session.user,
-        savedRole ? normalizeRole(savedRole) : null
-      );
-
-      setUser(currentUser);
+      void getProfileRole(supabase, session.user.id).then(result => {
+        if (mounted) setUser(result.role ? buildUser(session.user, result.role) : null);
+      });
     });
 
     return () => {
@@ -300,7 +310,6 @@ export function AuthProvider({
 
     if (demoMatch) {
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(ROLE_KEY, selectedRole);
         localStorage.setItem(DEMO_USER_KEY, JSON.stringify(demoMatch));
       }
       setUser(demoMatch);
@@ -325,10 +334,6 @@ export function AuthProvider({
        FALLBACK — try real Supabase (if configured)
     ------------------------------------------------------- */
 
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(ROLE_KEY, selectedRole);
-    }
-
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
@@ -343,25 +348,21 @@ export function AuthProvider({
         return { ok: false, error: "Login failed. No user returned." };
       }
 
-      const metadata = data.user.user_metadata || {};
-      const metadataRole =
-        metadata.role || metadata.user_role || metadata.account_role || null;
-
-      if (metadataRole) {
-        const actualRole = normalizeRole(metadataRole);
-        if (actualRole !== selectedRole) {
-          await supabase.auth.signOut();
-          if (typeof window !== "undefined") {
-            sessionStorage.removeItem(ROLE_KEY);
-          }
-          return {
-            ok: false,
-            error: `This account is registered as ${actualRole}, not ${selectedRole}.`,
-          };
-        }
+      const profileResult = await getProfileRole(supabase, data.user.id);
+      if (!profileResult.role) {
+        await supabase.auth.signOut();
+        return { ok: false, error: profileResult.error || "Unable to verify your CampusFlow profile." };
       }
 
-      const finalUser = buildUser(data.user, selectedRole);
+      if (profileResult.role !== selectedRole) {
+        await supabase.auth.signOut();
+        return {
+          ok: false,
+          error: `This account is registered as ${profileResult.role}, not ${selectedRole}.`,
+        };
+      }
+
+      const finalUser = buildUser(data.user, profileResult.role);
       setUser(finalUser);
       return { ok: true };
     } catch (error: any) {
@@ -380,7 +381,6 @@ export function AuthProvider({
     // Clear demo session
     if (typeof window !== "undefined") {
       localStorage.removeItem(DEMO_USER_KEY);
-      sessionStorage.removeItem(ROLE_KEY);
     }
 
     try {

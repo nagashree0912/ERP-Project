@@ -43,6 +43,7 @@ export interface DB {
   notifications: any[];
   complaints: any[];
   requests: any[];
+  marks_modification_requests: any[];
 }
 
 /* =========================================================
@@ -143,6 +144,7 @@ function emptyDB(): DB {
     notifications: [],
     complaints: [],
     requests: [],
+    marks_modification_requests: [],
   };
 }
 
@@ -267,6 +269,13 @@ function normalizeDB(
         source.requests
       )
         ? source.requests
+        : [],
+
+    marks_modification_requests:
+      Array.isArray(
+        source.marks_modification_requests
+      )
+        ? source.marks_modification_requests
         : [],
   };
 }
@@ -553,6 +562,7 @@ export function StoreProvider({
         "CampusFlow local database save error:",
         error
       );
+      toast("Could not save changes. Browser storage may be unavailable or full.");
     }
   }, [db]);
 

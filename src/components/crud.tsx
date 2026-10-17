@@ -8,8 +8,8 @@ export function useCrud(table: "students" | "teachers" | "parents" | "classes" |
   const { user } = useAuth();
   // Role-based authorization: only Principal & Teacher may mutate records.
   // Students & Parents get read-only access (view, search, export).
-  const can = user?.role === "principal" || user?.role === "teacher";
-  const deny = () => s.toast("Not permitted: only Principal or Teacher can do this");
+  const can = user?.role === "principal" || (user?.role === "teacher" && table !== "notices");
+  const deny = () => s.toast(table === "notices" ? "Only the Principal can manage notices" : "Not permitted: only Principal or Teacher can do this");
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any>(null);
   const [del, setDel] = useState<any>(null);
@@ -17,11 +17,12 @@ export function useCrud(table: "students" | "teachers" | "parents" | "classes" |
   const startEdit = (r: any) => { if (!can) return deny(); setEdit(r); setOpen(true); };
   const doDelete = (id: string) => { if (!can) return deny(); s.remove(table, id); };
   const save = (row: any) => {
-    if (!can) { setOpen(false); setEdit(null); return deny(); }
-    if (edit) s.update(table, edit.id, row);
-    else { const id = uid(table.slice(0, 3).toUpperCase()); s.add(table, { id, ...row }); }
+    if (!can) { setOpen(false); setEdit(null); deny(); return null; }
+    const id = edit ? String(edit.id) : uid(table.slice(0, 3).toUpperCase());
+    if (edit) s.update(table, id, row);
+    else s.add(table, { id, ...row });
     setOpen(false); setEdit(null);
+    return id;
   };
   return { rows: (s as any)[table] as any[], open, setOpen, edit, del, setDel, startAdd, startEdit, doDelete, save, can };
 }
-

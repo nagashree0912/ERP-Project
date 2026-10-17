@@ -8,6 +8,7 @@ import { Badge, statusTone } from "@/components/ui";
 import { SearchBar, Modal, Confirm, Empty, Pager, usePager, Field } from "@/components/ui2";
 import { useCrud } from "@/components/crud";
 import { csv, download } from "@/lib/data";
+import { getClassTeacherId } from "@/lib/classrooms";
 import {
   Users, User, GraduationCap, ChevronDown, Download, Upload,
   Plus, Trash2, BarChart3, X, Eye, Phone, Mail, BookOpen,
@@ -52,8 +53,10 @@ function PrincipalTeachers() {
   const [filterStatus, setFilterStatus] = useState("All Status");
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [classroomError, setClassroomError] = useState("");
 
   const allTeachers: any[] = c.rows as any[];
+  const classroomForTeacher = (teacherId: string) => store.classes.find(classroom => getClassTeacherId(classroom, allTeachers) === String(teacherId));
 
   const departments = useMemo(() => [
     "All Departments",
@@ -61,23 +64,52 @@ function PrincipalTeachers() {
   ], [allTeachers]);
 
   const rows = useMemo(() => allTeachers.filter((x: any) => {
-    const matchQ = !q || `${x.full_name} ${x.email} ${x.subject} ${x.department}`.toLowerCase().includes(q.toLowerCase());
+    const classroomName = store.classes.find(classroom => getClassTeacherId(classroom, allTeachers) === String(x.id))?.name || "";
+    const matchQ = !q || `${x.full_name} ${x.email} ${x.subject} ${x.department} ${classroomName}`.toLowerCase().includes(q.toLowerCase());
     const matchDept = filterDept === "All Departments" || x.department === filterDept;
     const matchStatus = filterStatus === "All Status" || x.status === filterStatus;
     return matchQ && matchDept && matchStatus;
-  }), [allTeachers, q, filterDept, filterStatus]);
+  }), [allTeachers, store.classes, q, filterDept, filterStatus]);
 
   const { page, setPage, pages, slice } = usePager(rows, 10);
 
   const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    c.save({
+    const classroomId = String(f.get("classroom_id") || "");
+    if (classroomId && !store.classes.some(classroom => String(classroom.id) === classroomId)) {
+      setClassroomError("Please select an existing classroom.");
+      return;
+    }
+
+    setClassroomError("");
+    const teacherId = c.save({
       full_name: f.get("full_name"), email: f.get("email"), phone: f.get("phone"),
       department: f.get("department"), subject: f.get("subject"),
       qualification: f.get("qualification"), experience: f.get("experience"),
       joining_date: f.get("joining_date") || "2026-08-01", status: "Active"
     });
+    if (!teacherId) return;
+
+    if (c.edit || classroomId) {
+      store.classes.forEach(classroom => {
+        if (getClassTeacherId(classroom, store.teachers) === teacherId && String(classroom.id) !== classroomId) {
+          store.update("classes", classroom.id, { class_teacher_id: null, teacher_id: null, class_teacher: null });
+        }
+      });
+    }
+    if (classroomId) {
+      store.update("classes", classroomId, { class_teacher_id: teacherId, teacher_id: null, class_teacher: null });
+    }
+  };
+
+  const deleteTeacher = (teacherId: string) => {
+    if (classroomForTeacher(teacherId)) {
+      store.toast("This teacher is assigned as a class teacher. Reassign the classroom before deleting the teacher.");
+      c.setDel(null);
+      return;
+    }
+    c.doDelete(teacherId);
   };
 
   const handleBulkSave = (teachers: any[]) => {
@@ -171,6 +203,7 @@ function PrincipalTeachers() {
                   <th>Email</th>
                   <th>Department</th>
                   <th>Subject</th>
+                  <th>Classroom</th>
                   <th>Qualification</th>
                   <th>Experience</th>
                   <th>Status</th>
@@ -200,6 +233,7 @@ function PrincipalTeachers() {
                       </span>
                     </td>
                     <td className="text-sm">{x.subject}</td>
+                    <td className="text-sm">{classroomForTeacher(x.id)?.name || "—"}</td>
                     <td className="text-xs text-slate-500">{x.qualification || "—"}</td>
                     <td className="text-xs text-slate-500">{x.experience || "—"}</td>
                     <td><Badge tone={x.status === "On Leave" ? "yellow" : statusTone(x.status)}>{x.status || "Active"}</Badge></td>
@@ -240,6 +274,18 @@ function PrincipalTeachers() {
           <Field label="Qualification"><input name="qualification" defaultValue={c.edit?.qualification} className="input" /></Field>
           <Field label="Experience (e.g. 5 years)"><input name="experience" defaultValue={c.edit?.experience} className="input" /></Field>
           <Field label="Joining date"><input name="joining_date" type="date" defaultValue={c.edit?.joining_date} className="input" /></Field>
+          <Field label="Classroom (optional)">
+            <select
+              name="classroom_id"
+              defaultValue={c.edit ? classroomForTeacher(c.edit.id)?.id || "" : ""}
+              className="input"
+            >
+              <option value="">No classroom assignment</option>
+              {store.classes.map((classroom: any) => <option key={classroom.id} value={classroom.id}>{classroom.name}</option>)}
+            </select>
+            {store.classes.length === 0 && <p className="mt-1 text-xs text-amber-700">No classrooms are available. Create a classroom first to assign this teacher.</p>}
+          </Field>
+          {classroomError && <p role="alert" className="sm:col-span-2 text-sm text-rose-600">{classroomError}</p>}
           <div className="sm:col-span-2 flex justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={() => c.setOpen(false)}>Cancel</button>
             <button className="btn-primary">Save Teacher</button>
@@ -248,7 +294,7 @@ function PrincipalTeachers() {
       </Modal>
 
       {/* ── Delete Confirm ── */}
-      <Confirm open={!!c.del} onClose={() => c.setDel(null)} onYes={() => c.doDelete(c.del.id)} title="Delete teacher" msg={`Delete ${c.del?.full_name}?`} />
+      <Confirm open={!!c.del} onClose={() => c.setDel(null)} onYes={() => deleteTeacher(c.del.id)} title="Delete teacher" msg={`Delete ${c.del?.full_name}? Assigned class teachers must be reassigned first.`} />
 
       {/* ── Bulk Add Modal ── */}
       <BulkAddTeacherModal open={showBulkModal} onClose={() => setShowBulkModal(false)} onSave={handleBulkSave} />

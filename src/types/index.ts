@@ -1,9 +1,9 @@
 export type Role = "principal" | "teacher" | "student" | "parent";
 export interface Profile { id: string; email: string; full_name: string; role: Role; phone?: string; avatar_url?: string; department?: string; }
-export interface Student { id: string; student_code: string; full_name: string; email: string; phone: string; gender: string; dob: string; department: string; course: string; year: string; section: string; roll_number: string; address: string; parent_id?: string; admission_date: string; status: string; avatar?: string; }
+export interface Student { id: string; student_code: string; full_name: string; email: string; phone: string; gender: string; dob: string; department: string; course: string; year: string; section: string; roll_number: string; address: string; parent_id?: string; class_id?: string; admission_date: string; status: string; avatar?: string; }
 export interface Teacher { id: string; teacher_code: string; full_name: string; email: string; phone: string; department: string; subject: string; qualification: string; joining_date: string; status: string; avatar?: string; }
 export interface Parent { id: string; full_name: string; email: string; phone: string; occupation?: string; address?: string; status: string; }
-export interface ClassRoom { id: string; name: string; department: string; year: string; section: string; room: string; class_teacher?: string; strength?: number; }
+export interface ClassRoom { id: string; name: string; class_teacher_id?: string; department?: string; year?: string; section?: string; room?: string; class_teacher?: string; strength?: number; }
 export interface Subject { id: string; name: string; code: string; department: string; credits: number; teacher?: string; }
 export interface AttendanceRecord { id: string; date: string; class_id: string; subject: string; student_id: string; student_name: string; status: "Present"|"Absent"|"Late"|"Leave"; }
 export interface Mark { id: string; student_id: string; student_name: string; class_id: string; subject: string; exam: string; internal: number; external: number; total: number; grade: string; status: string; }
@@ -67,3 +67,28 @@ export interface ParentRequest {
 
 export const gradeFor = (pct: number) => pct>=90?"A+":pct>=80?"A":pct>=70?"B+":pct>=60?"B":pct>=50?"C":"F";
 
+export interface MarksModificationRequest {
+  id: string;
+  student_id: string;
+  student_name: string;
+  student_code?: string;
+  subject: string;
+  exam: string;
+  class_id?: string;
+  class_name?: string;
+  is_sample?: boolean;
+  current_internal?: number;
+  current_external?: number;
+  current_marks: number;
+  requested_internal: number;
+  requested_external: number;
+  requested_marks: number;
+  teacher_name: string;
+  teacher_email?: string;
+  reason: string;
+  submission_date: string;
+  status: "Pending" | "Approved" | "Rejected";
+  principal_remarks?: string;
+  decided_at?: string;
+  decided_by?: string;
+}
